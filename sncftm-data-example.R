@@ -1,14 +1,18 @@
-# Title: Example of data used for g-estimation of SNCFTMs
-# Author: Joy Shi
-# Last modified: 2021-06-21
+# ------ G-ESTIMATION OF STRUCTUARL NESTED CUMULATIVE FAILURE TIME MODELS: -----
+# -------------------------------- DATA EXAMPLE --------------------------------
+#
+# -------------------------------- BY: Joy Shi ---------------------------------
+# -------------------------- LAST MODIFIED: 2021-06-21 -------------------------
+#
 
-
-# Data parameters
+# ------------------------------- Data parameters ------------------------------
 n <- 10000
 set.seed(54432)
 time.points <- 5
 
-# Generating variables
+
+# ---------------------------- Generating variables ----------------------------
+
   # id
   id <- seq(1:n)
   
@@ -74,7 +78,10 @@ time.points <- 5
   rownames(sim.data) <- NULL
   head(sim.data, n=20)
   
-# SNCFTM with adjustment for confounding   
+  
+# ---------------------- Analysis of simulated data using ----------------------
+# ------------------- SNCFTM with adjustment for confounding -------------------
+  
 sncftm.confresults <- sncftm.conf(data = sim.data,
                   id = "id",
                   time = "time",
@@ -96,7 +103,9 @@ sncftm.confresults <- sncftm.conf(data = sim.data,
                   R=10,
                   parallel=T)
 
-# SNCFTM with instrumental variable analysis
+# ---------------------- Analysis of simulated data using ----------------------
+# ----------------------- instrumental variable analysis -----------------------
+
 sncftm.ivresults <- sncftm.iv(data = sim.data,
                   id = "id",
                   time = "time",
