@@ -18,6 +18,6 @@ Simulations to assess the performance of these models are also available. Data w
 
 | Data-generating model | DAG |
 |------------|-------------|
-| Time-fixed instrument, exposure, confounder and outcome | <img src="/dags/dag1.png" width=50%> |
+| Time-fixed instrument, exposure, confounder and outcome | <img src="/dags/dag1.png" width=40%> |
 | Time-fixed instrument, exposure and confounder; time-varying outcome | <img src="/dags/dag2.png" width=50%> |
-| Time-fixed instrument; time-varying exposure, confounder and outcome | <img src="/dags/dag3.png" width=50%> |
+| Time-fixed instrument; time-varying exposure, confounder and outcome | <img src="/dags/dag3.png" width=70%> |
