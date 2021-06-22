@@ -1,19 +1,23 @@
-# Title: G-estimation of SNCFTMs under the assumption of no unmeasured confounders
-# Author: Joy Shi
-# Last modified: 2021-06-21
+# ------ G-ESTIMATION OF STRUCTUARL NESTED CUMULATIVE FAILURE TIME MODELS ------
+# ---------------------- WITH ADJUSTMENT FOR CONFOUNDERS -----------------------
 #
-# Notes: please see simulated data as an example of how the data needs to be
+# -------------------------------- BY: Joy Shi ---------------------------------
+# -------------------------- LAST MODIFIED: 2021-06-21 -------------------------
+#
+# NOTES: 
+# Please see simulated data as an example of how the data needs to be
 # set up for the analysis
 # 
+# REQUIREMENTS:
 # The function relies on packages 'optimx' and 'parallel' (for paralellization
 # of the code)
 #
-# Based on the the SNCFTM SAS macro by Sally Picciotto (see 
+# BASED ON THE SNCFTM SAS MACRO BY SALLY PICCIOTTO:
+# For more information, refer to
 # https://www.hsph.harvard.edu/causal/software/ and 
 # https://pubmed.ncbi.nlm.nih.gov/24347749/
-# for more information)
-
-# Arguments:
+#
+# ARGUMENTS:
 #  - data: name of the data frame containing the variables in the model
 #  - id: name of the variable (as a string) corresponding to participant index
 #  - time: name of the variable (as a string) corresponding to time index 
@@ -44,12 +48,12 @@
 #  - R: number of bootstraps
 #  - parallel: set to T to parallelize
 #  - seed: seed used for bootstrapping
- 
 
-library('parallel')
-library('optimx')
+# Installing and loading required packages
+if (!require('parallel')) install.packages('parallel'); library('parallel')
+if (!require('optimx')) install.packages('optimx'); library('optimx')
 
-## (1) SNCFTM Function
+# SNCFTM function 
 sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity", y,
                       clost=NULL, clost.modelvars=NULL, cdeath=NULL, cdeath.modelvars=NULL,
                       blipfunction, start.value=0,
