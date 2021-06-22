@@ -1,4 +1,4 @@
-# Title: G-estimation of SNCFTMs under the assumption of no unmeasured confounders
+# Title: G-estimation of SNCFTMs using instrumental variable analysis
 # Author: Joy Shi
 # Last modified: 2021-06-21
 #
@@ -18,10 +18,11 @@
 #  - id: name of the variable (as a string) corresponding to participant index
 #  - time: name of the variable (as a string) corresponding to time index 
 #          (minimum must be 1)
+#  - z: name of the variable (as a string) corresponding to the instrument
+#  - z.modelvars: formula for the model for the instrument
+#  - z.family: family for the model for the instrument (options are "gaussian" 
+#    for linear regression; "binomial" for logistic regression)
 #  - x: name of the variable (as a string) corresponding to the treatment
-#  - x.modelvars: formula for the model for treatment
-#  - x.linkfunction: link function for the treatment model (options are 
-#    "identity" for linear regression and "logit" for logistic regression)
 #  - y: name of the variable (as a string) corresponding to the outcome
 #  - clost: name of the variable (as a string) corresponding to censoring due
 #    to lost to follow-up
@@ -29,6 +30,12 @@
 #    follow-up
 #  - cdeath: name of the variable (as a string) corresponding to censoring due
 #    to death
+#  - z.indicator: (optional) name of the variable (as a string) corresponding
+#    to the indicator for which observations should be used in the model for 
+#    for the treatment (e.g. only among controls in a nested case-control sample)
+#  - z.timefixed: set to T if the instrument is time fixed (i.e. the model for
+#    the instrument will be estimated only among observations at baseline;
+#    otherwise will use all observation time points)
 #  - death.modelvars: formula for the model for censoring due to death
 #  - blipfunction: options are 1 (for 1+[exp(psi*Am)-1]/(k-m)) or 2 
 #    (for psi*Am)
@@ -38,23 +45,22 @@
 #  - grid.range: range of psi values to calculate the estimating equation; a
 #    single value c is given and the range is (+c, -c)
 #  - grid.increment: increments of psi used to calculate the estimating equation
+#  - blip.data: name of the data frame for blipping up and down; if NULL then
+#    will use the data frame specified under the "data" argument
 #  - blipupdown: set to T to obtain marginal cumulative risks under the "never
 #    treat" and "always treat" regimes by blipping down and blipping up
 #  - boot: set to T to obtain 95% CI by bootstrapping
 #  - R: number of bootstraps
 #  - parallel: set to T to parallelize
 #  - seed: seed used for bootstrapping
- 
-
-library('parallel')
-library('optimx')
 
 ## (1) SNCFTM Function
-sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity", y,
+sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x, y,
                       clost=NULL, clost.modelvars=NULL, cdeath=NULL, cdeath.modelvars=NULL,
+                      z.indicator=NULL, z.timefixed=T,
                       blipfunction, start.value=0,
                       grid=F, grid.range=1.5, grid.increment=0.01,
-                      blipupdown=T, boot=T, R=1000, parallel=T, seed=549274){
+                      blip.data=NULL, blipupdown=T, boot=T, R=1000, parallel=T, seed=549274){
   
   # Data Prep and calculations not required for psi 
   if (parallel==T){numCores <- max(detectCores()-1, 1)}
@@ -62,12 +68,45 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
   estf.dataprep <- function(data){
     d <- data.frame(data)
     
-    # Predicted values from X and censoring models
-    if (x.linkfunction=="identity"){x.model <- glm(as.formula(paste(x, "~", paste(x.modelvars)[2], sep="")), data=d)
-    } else if (x.linkfunction=="logit"){
-      x.model <- glm(as.formula(paste(x, "~", paste(x.modelvars)[2], sep="")), family=binomial, data=d)
-    } else{print("Invalid link function for x")}
-    d$x.pred <- predict(x.model, newdata=d, type="response")
+    # Predicted values from Z and censoring models
+    if (z.timefixed==T){
+      if (is.null(z.indicator)==T){
+        if (z.family=="gaussian"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+            data=d[which(d[[time]]==1),])
+        } else if (z.family=="binomial"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+            family=binomial, data=d[which(d[[time]]==1),])
+        }
+      } else if (is.null(z.indicator)==F){
+        if (z.family=="gaussian"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         data=d[which(d[[time]]==1 & d[[z.indicator]]==1),])
+        } else if (z.family=="binomial"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         family=binomial, data=d[which(d[[time]]==1 & d[[z.indicator]]==1),])
+        }
+      }
+    } else if (z.timefixed==F){
+      if (is.null(z.indicator)==T){
+        if (z.family=="gaussian"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         data=d)
+        } else if (z.family=="binomial"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         family=binomial, data=d)
+        }
+      } else if (is.null(z.indicator)==F){
+        if (z.family=="gaussian"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         data=d[which(d[[z.indicator]]==1),])
+        } else if (z.family=="binomial"){
+          z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
+                         family=binomial, data=d[which(d[[z.indicator]]==1),])
+        }
+      }      
+    }
+    d$z.pred <- predict(z.model, newdata=d, type="response")
     if (is.null(clost)==F & is.null(clost.modelvars)==F){
       clost.model <- glm(as.formula(paste(clost, "==0~", paste(clost.modelvars)[2], sep="")), family=binomial(), data=d)
       d$clost.pred <- predict(clost.model, d, type="response")
@@ -93,7 +132,8 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
     cero <- d[which(d[[id]] %in% ever.y.id),] # Restrict to ever had an event
     cero$ever_treat <- ifelse((cero[[id]] %in% ever.treat.id)==T, 1, 0) # Indicate if ever treated
     cero$count <- ave(rep(1, nrow(cero)), cero[[id]], FUN = sum) # Count for each ID
-
+    cero <- cero[which(!is.na(cero[,z])),]  # Restrict to non-missing z  
+  
     # Calculating contributions to estimating equation among untreated
     cero.untreated <- cero[which(cero$ever_treat==0),]
     if (nrow(cero.untreated)==0){
@@ -120,10 +160,10 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
       tpcontributed.untreated <- n.followup+1-totalfu.untreated # Number of time points contributed to est eq
       hm.untreated <- tpcontributed.untreated*w.untreated # Contribution, weighted by censoring weights
       
-      # Multiply H(psi) by X-E[X]
-      u0i.untreated <- hm.untreated * (cero.untreated[[x]]-cero.untreated[["x.pred"]])
+      # Multiply H(psi) by Z-E[Z]
+      u0i.untreated <- hm.untreated * (cero.untreated[[z]]-cero.untreated[["z.pred"]])
       
-      # Calculating covariance matrix
+      # Calculating covariace matrix
       newu1.untreated <- aggregate(u0i.untreated, list(cero.untreated[[id]]), FUN=sum)[,2]
       newcov.untreated <- newu1.untreated %*% newu1.untreated
     }
@@ -160,12 +200,13 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
       tcount.treated = tcount.treated,
       y.treated = y.treated
     )
+    
     return(dataprep.env)
   }
   dataprep.env <- estf.dataprep(data)
 
   # Calculations for estimating equation dependent on psi
-  estf.conf <- function(psi, dataprep.results, blipfunction){
+  estf.iv <- function(psi, dataprep.results, blipfunction){
     hm <- rep(0, nrow(dataprep.results$cero.treated))
     last <- 0
     for (i in 1:length(dataprep.results$tcount.treated)){
@@ -200,8 +241,8 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
       }
       hm[start:last] <- hm.id
     }
-    # Multiply Hm with weights and A-E[A]    
-    u0i.treated <- hm*dataprep.results$w.treated*(dataprep.results$cero.treated[[x]]-dataprep.results$cero.treated[["x.pred"]])
+    # Multiply Hm with weights and Z-E[Z]    
+    u0i.treated <- hm*dataprep.results$w.treated*(dataprep.results$cero.treated[[z]]-dataprep.results$cero.treated[["z.pred"]])
     
     # Covariance matrix
     newu1.treated <- aggregate(u0i.treated, list(dataprep.results$cero.treated[[id]]), FUN=sum)[,2]
@@ -219,9 +260,9 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
   psi <- NULL
   psi.esteq <- NULL
   psi.converge <- NULL
-  estf.results <- suppressWarnings(optimx(start.value, estf.conf, dataprep.results=dataprep.env, blipfunction=blipfunction, method=c("nlminb")))
+  estf.results <- suppressWarnings(optimx::optimx(start.value, estf.iv, dataprep.results=dataprep.env, blipfunction=blipfunction, method=c("nlminb")))
   if (estf.results$convcode!=0|estf.results$value>0.0001){
-    estf.results1 <- suppressWarnings(optimx(start.value, estf.conf, dataprep.results=dataprep.env, blipfunction=blipfunction, method=c("nlm")))
+    estf.results1 <- suppressWarnings(optimx::optimx(start.value, estf.iv, dataprep.results=dataprep.env, blipfunction=blipfunction, method=c("nlm")))
     if (estf.results1$value<estf.results$value){
       psi <- estf.results1$p1
       psi.esteq <- estf.results1$value
@@ -246,22 +287,45 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
     if (parallel==T){
       cl <- makeCluster(numCores)
       clusterExport(cl, ls(), envir=environment())
-      est.eq.results <- parLapply(cl, seq(-grid.range, grid.range, by=grid.increment), function(i) {estf.conf(i, dataprep.env, blipfunction)})
+      est.eq.results <- parLapply(cl, seq(-grid.range, grid.range, by=grid.increment), function(i) {estf.iv(i, dataprep.env, blipfunction)})
       stopCluster(cl)
       psi.grid <- data.frame(cbind(psi=seq(-grid.range, grid.range, by=grid.increment), est.eq=do.call(rbind, est.eq.results)))
       }
     if (parallel==F){
       psi.grid <- data.frame(cbind(psi=seq(-grid.range, grid.range, by=grid.increment),
-        est.eq=sapply(seq(-grid.range, grid.range, by=grid.increment), function(i){estf.conf(i, dataprep.env, blipfunction)})))
+        est.eq=sapply(seq(-grid.range, grid.range, by=grid.increment), function(i){estf.iv(i, dataprep.env, blipfunction)})))
     }
   results[["psi.grid"]] <- psi.grid
   }
   
   # Function for blipping down/up
   blipf <- function(dataprep.results, psi.estimate){
-    blipdown <- expand.grid(unique(dataprep.results$d[[id]]), unique(dataprep.results$d[[time]]))
+    if (is.null(blip.data)==T){
+      blip.d <- dataprep.results$d
+    } else{
+      blip.d <- blip.data
+      if (is.null(clost)==F & is.null(clost.modelvars)==F){
+        clost.model <- glm(as.formula(paste(clost, "==0~", paste(clost.modelvars)[2], sep="")), family=binomial(), data=blip.d)
+        blip.d$clost.pred <- predict(clost.model, blip.d, type="response")
+        blip.d$clost <- blip.d[,clost]
+      } else{
+        blip.d$clost.pred <- 1
+        blip.d$clost <- 0
+      }
+      if (is.null(cdeath)==F & is.null(cdeath.modelvars)==F){
+        cdeath.model <- glm(as.formula(paste(cdeath, "==0~", paste(cdeath.modelvars)[2], sep="")), family=binomial(), data=blip.d)
+        blip.d$cdeath.pred <- predict(cdeath.model, blip.d, type="response")
+        blip.d$cdeath <- blip.d[,cdeath]
+      } else{
+        blip.d$cdeath.pred <- 1
+        blip.d$cdeath <- 0
+      }
+      blip.d <- blip.d[order(blip.d[,id], blip.d[,time]),]    
+    }    
+    
+    blipdown <- expand.grid(unique(blip.d[[id]]), unique(blip.d[[time]]))
     colnames(blipdown) <- c(id, time)
-    blipdown <- merge(x=as.data.frame(dataprep.results$d), y=blipdown, by=c(id, time), all=T)
+    blipdown <- merge(x=as.data.frame(blip.d), y=blipdown, by=c(id, time), all=T)
     blipdown$ever_y <- ifelse(blipdown[[id]] %in% unique(blipdown[which(blipdown[[y]]==1),][[id]]), 1, 0)
     blipdown$ever_clost <- ifelse(blipdown[[id]] %in% unique(blipdown[which(blipdown$clost==1),][[id]]), 1, 0)
     blipdown$ever_cdeath <- ifelse(blipdown[[id]] %in% unique(blipdown[which(blipdown$cdeath==1),][[id]]), 1, 0)
@@ -275,7 +339,7 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
     y.0 <- paste(y, 0, sep = ".")
     blipdown[, y.0] <- NA
     
-    for (t in unique(dataprep.results$d[[time]])){
+    for (t in unique(blip.d[[time]])){
       var <- paste("blip0", t, sep="_")
       varcum <- paste("blip0cum", t, sep="_")
       if (blipfunction==1){
@@ -364,9 +428,9 @@ sncftm.conf <- function(data, id, time, x, x.modelvars, x.linkfunction="identity
     psiboot <- NULL
     psiboot.esteq <- NULL
     psiboot.converge <- NULL
-    estf.bootresults <- suppressWarnings(optimx(start.value, estf.conf, dataprep.results=dataprep.boot, blipfunction=blipfunction, method=c("nlminb")))
+    estf.bootresults <- suppressWarnings(optimx::optimx(start.value, estf.iv, dataprep.results=dataprep.boot, blipfunction=blipfunction, method=c("nlminb")))
     if (estf.bootresults$convcode!=0|estf.bootresults$value>0.0001){
-      estf.bootresults1 <- suppressWarnings(optimx(start.value, estf.conf, dataprep.results=dataprep.boot, blipfunction=blipfunction, method=c("nlm")))
+      estf.bootresults1 <- suppressWarnings(optimx::optimx(start.value, estf.iv, dataprep.results=dataprep.boot, blipfunction=blipfunction, method=c("nlm")))
       if (estf.bootresults1$value<estf.bootresults$value){
         psiboot <- estf.bootresults1$p1
         psiboot.esteq <- estf.bootresults1$value
