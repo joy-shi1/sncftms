@@ -13,3 +13,6 @@ R code is provided to g-estimate SNCFTMs based on (1) adjustment of exposure-out
 The SNCFTM functions are based on the SNCFTM SAS macro by Sally Picciotto (more information is available [Named Link](https://www.hsph.harvard.edu/causal/software/ "here"). 
 
 Please see the data example as an illustration of how the data must be set up to run these models.
+
+Simulations to assess the performance of these models are also available. Data were generated according to the following DAGs:
+
