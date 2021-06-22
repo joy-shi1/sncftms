@@ -16,7 +16,7 @@ Please see the data example as an illustration of how the data must be set up to
 
 Simulations to assess the performance of these models are also available. Data were generated according to the following DAGs:
 
-| Data-generating model | DAG |
+| Data-Generating Model | DAG |
 |------------|-------------|
 | Time-fixed instrument, exposure, confounder and outcome | <img src="/dags/dag1.png" width=45%> |
 | Time-fixed instrument, exposure and confounder; time-varying outcome | <img src="/dags/dag2.png" width=65%> |
