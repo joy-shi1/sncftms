@@ -72,7 +72,7 @@ sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x,
   
   # Data Prep and calculations not required for psi 
   if (parallel==T){numCores <- max(detectCores()-1, 1)}
-
+  
   estf.dataprep <- function(data){
     d <- data.frame(data)
     
@@ -81,18 +81,18 @@ sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x,
       if (is.null(z.indicator)==T){
         if (z.family=="gaussian"){
           z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
-            data=d[which(d[[time]]==1),])
+                         data=d[which(d[[time]]==min(d[[time]])),])
         } else if (z.family=="binomial"){
           z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
-            family=binomial, data=d[which(d[[time]]==1),])
+                         family=binomial, data=d[which(d[[time]]==min(d[[time]])),])
         }
       } else if (is.null(z.indicator)==F){
         if (z.family=="gaussian"){
           z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
-                         data=d[which(d[[time]]==1 & d[[z.indicator]]==1),])
+                         data=d[which(d[[time]]==min(d[[time]]) & d[[z.indicator]]==1),])
         } else if (z.family=="binomial"){
           z.model <- glm(as.formula(paste(z, "~", paste(z.modelvars)[2], sep="")), 
-                         family=binomial, data=d[which(d[[time]]==1 & d[[z.indicator]]==1),])
+                         family=binomial, data=d[which(d[[time]]==min(d[[time]]) & d[[z.indicator]]==1),])
         }
       }
     } else if (z.timefixed==F){
@@ -141,7 +141,7 @@ sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x,
     cero$ever_treat <- ifelse((cero[[id]] %in% ever.treat.id)==T, 1, 0) # Indicate if ever treated
     cero$count <- ave(rep(1, nrow(cero)), cero[[id]], FUN = sum) # Count for each ID
     cero <- cero[which(!is.na(cero[,z])),]  # Restrict to non-missing z  
-  
+    
     # Calculating contributions to estimating equation among untreated
     cero.untreated <- cero[which(cero$ever_treat==0),]
     if (nrow(cero.untreated)==0){
