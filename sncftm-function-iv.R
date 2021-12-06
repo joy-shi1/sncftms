@@ -2,19 +2,19 @@
 # -------------------- USING INSTRUMENTAL VARIABLE ANALYSIS --------------------
 #
 # -------------------------------- BY: Joy Shi ---------------------------------
-# -------------------------- LAST MODIFIED: 2021-06-21 -------------------------
+# -------------------------- LAST MODIFIED: 2021-12-06 -------------------------
 #
 # NOTES: 
 # Please see simulated data as an example of how the data needs to be
 # set up for the analysis
 # 
 # REQUIREMENTS:
-# The function relies on packages 'optimx' and 'parallel' (for paralellization
-# of the code)
+# The function relies on packages 'optimx' and 'parallel' (for paralleling 
+# the code)
 #
 # BASED ON THE SNCFTM SAS MACRO BY SALLY PICCIOTTO:
 # For more information, refer to
-# https://www.hsph.harvard.edu/causal/software/ and 
+# https://causalab.sph.harvard.edu/software/ and 
 # https://pubmed.ncbi.nlm.nih.gov/24347749/
 
 # ARGUMENTS:
@@ -52,7 +52,11 @@
 #  - blip.data: name of the data frame for blipping up and down; if NULL then
 #    will use the data frame specified under the "data" argument
 #  - blipupdown: set to T to obtain marginal cumulative risks under the "never
-#    treat" and "always treat" regimes by blipping down and blipping up
+#    treat" and intervention regimes by blipping down and blipping up
+#  - intervention.regime: specification of the treatment regime that is 
+#    targeted when blipping up; should be a vector of the same length as 
+#    the number of time points; if not specified, then the intervention.regime
+#    will be set to "always treat"
 #  - boot: set to T to obtain 95% CI by bootstrapping
 #  - R: number of bootstraps
 #  - parallel: set to T to parallelize
@@ -68,7 +72,8 @@ sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x,
                       z.indicator=NULL, z.timefixed=T,
                       blipfunction, start.value=0,
                       grid=F, grid.range=1.5, grid.increment=0.01,
-                      blip.data=NULL, blipupdown=T, boot=T, R=1000, parallel=T, seed=549274){
+                      blip.data=NULL, blipupdown=T, intervention.regime=NULL,
+                      boot=T, R=1000, parallel=T, seed=549274){
   
   # Data Prep and calculations not required for psi 
   if (parallel==T){numCores <- max(detectCores()-1, 1)}
@@ -369,7 +374,11 @@ sncftm.iv <- function(data, id, time, z, z.modelvars=~1, z.family="gaussian", x,
     Y0avgs <- rev(meanY[[y.0]])
     
     # Blipping Up
-    regime <- rep(1, dataprep.results$n.followup)
+    if (is.null(intervention.regime)==T){
+      regime <- rep(1, dataprep.results$n.followup)
+    } else{
+      regime <- intervention.regime
+    }
     for (k in 1:dataprep.results$n.followup){
       matrix.tmp <- matrix(0, nrow=k, ncol=k)
       km1 <- k-1
